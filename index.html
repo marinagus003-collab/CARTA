@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Carta de cumpleaños</title>
 <style>
+@font-face {
+    font-family: 'Birds of Paradise';
+    src: url('Birds of Paradise.ttf') format('truetype');
+}
+
 :root {
     --bg: #000;
     --fg: #fff;
@@ -64,12 +69,15 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
 .overlay.open { opacity: 1; pointer-events: auto; }
 .overlay.closing { opacity: 0; pointer-events: none; }
 
+/* MODIFICADO: Se añade max-height y overflow-y para permitir el scroll */
 .card {
     width: min(800px, 92vw);
+    max-height: 90vh; /* Límite de altura para que quepa en pantalla */
+    overflow-y: auto; /* Muestra una barra de scroll si el contenido es muy alto */
     background: var(--card-bg);
     border: 2px solid var(--card-pink);
     border-radius: 24px;
-    padding: clamp(18px, 4vw, 28px);
+    padding: clamp(24px, 5vw, 40px);
     box-shadow: 0 20px 80px rgba(0, 0, 0, 0.25);
     transform: translateY(20%) scale(0.9);
     opacity: 0;
@@ -79,14 +87,26 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     transform: translateY(0) scale(1);
     opacity: 1;
 }
+
 .card h1, .card p {
     color: var(--text-dark);
+    font-family: 'Birds of Paradise', cursive;
+    text-align: center;
+    font-weight: normal;
 }
-.card h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 38px); }
-.card p { line-height: 1.6; font-size: clamp(16px, 2.5vw, 18px); }
+.card h1 { 
+    margin: 0 0 15px; 
+    font-size: clamp(48px, 8vw, 70px);
+}
+.card p { 
+    line-height: 1.5; 
+    font-size: clamp(28px, 4vw, 40px);
+    margin-bottom: 1.2em;
+}
 
 .close {
-    margin-top: 16px;
+    display: block;
+    margin: 24px auto 0;
     background: var(--close-btn-bg);
     color: var(--text-dark);
     border: 1px solid var(--close-btn-border);
@@ -94,6 +114,8 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     padding: 10px 16px;
     cursor: pointer;
     transition: background-color 200ms ease;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial;
+    font-size: 14px;
 }
 .close:hover {
     background: #e9e1cd;
@@ -144,12 +166,11 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     width: 100%;
     height: 100%;
     background: var(--flap-bg);
-    clip-path: polygon(-2px -2px, calc(100% + 2px) -2px, 50% 50%); /* Ajuste para el borde */
+    clip-path: polygon(-2px -2px, calc(100% + 2px) -2px, 50% 50%);
     transform-origin: top;
     transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 5;
 }
-/* Creamos un pseudoelemento para simular el borde del triángulo */
 .flap::before {
     content: '';
     position: absolute;
@@ -157,9 +178,9 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     left: 0;
     width: 100%;
     height: 100%;
-    clip-path: polygon(0 0, 100% 0, 50% 50%, 50% calc(50% - 2px), calc(100% - 2.8px) 0, 2.8px 0);
     background-color: var(--card-pink);
     z-index: -1;
+    clip-path: polygon(0 0, 2.8px 0, 50% calc(50% - 2px), calc(100% - 2.8px) 0, 100% 0, 50% 50%);
 }
 .envelope-wrapper.opening .flap {
     transform: rotateX(180deg);
@@ -198,12 +219,14 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     z-index: 110;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 400ms ease-in-out;
+    transition: opacity 600ms ease-in-out;
 }
 .photos-container.show {
     opacity: 1;
     pointer-events: auto;
 }
+
+/* MODIFICADO: Se añade la animación para las fotos */
 .photo {
     width: auto;
     height: auto;
@@ -212,6 +235,28 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     border-radius: 12px;
     border: 2px solid #fff;
     box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    
+    /* Estado inicial de la animación: invisible y un poco más abajo */
+    opacity: 0;
+    transform: translateY(30px);
+    transition: transform 600ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 600ms ease;
+}
+
+/* Estado final de la animación: visible y en su posición original */
+.photos-container.show .photo {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Retraso escalonado para que aparezcan una por una */
+.photos-container.show .photo:nth-child(1) {
+    transition-delay: 200ms;
+}
+.photos-container.show .photo:nth-child(2) {
+    transition-delay: 350ms;
+}
+.photos-container.show .photo:nth-child(3) {
+    transition-delay: 500ms;
 }
 </style>
 </head>
@@ -230,7 +275,7 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     <div class="card" id="card">
         <h1>Para mi amiga, mi princesa de luz ✨</h1>
         <p>
-            Hoy celebro tu vida, tu risa fácil y esa forma tan tuya de convertir los días comunes en recuerdos extraordinarios. Gracias por ser el abrazo cuando el mundo pesa, por escuchar sin prisas y por enseñarme que la amistad también es un hogar. Deseo que este año te regale motivos para sonreír a lo grande, metas cumplidas y un montón de amaneceres bonitos.
+          Primero que nada quiero disculparme contigo, mi princesa. Sé que tu cumpleaños ya paso y no es hoy, y créeme que me hubiera gustado felicitarte en ese mismo día, pero por diferentes motivos no pude hacerlo. Aun así, quiero que sepas que no por eso deja de ser importante para mí.
         </p>
         <p>
             Feliz cumpleaños, princesa. Que la vida te siga tratando con la dulzura que tú le regalas a los demás.
@@ -240,14 +285,14 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
 </div>
 
 <div class="photos-container" id="photos-container">
-    <img src="https://via.placeholder.com/300x400/8c7ae6/ffffff?text=Tu+Foto+1" alt="Foto de tu amiga" class="photo">
+    <img src="foto1.jpg" alt="Foto de tu amiga" class="photo">
     <img src="https://via.placeholder.com/300x400/fbc531/ffffff?text=Tu+Foto+2" alt="Otra foto de tu amiga" class="photo">
     <img src="https://via.placeholder.com/300x400/e84393/ffffff?text=Tu+Foto+3" alt="Otra foto de tu amiga" class="photo">
 </div>
 
 <script>
 (() => {
-    // --- TODA LA ANIMACIÓN DE PARTÍCULAS ORIGINAL SE MANTIENE IGUAL ---
+    // El código JavaScript no necesita cambios
     const canvas = document.getElementById('fx');
     const ctx = canvas.getContext('2d');
     const DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -471,7 +516,6 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
 
     requestAnimationFrame(loop);
 
-    // --- LÓGICA DEL SOBRE, LA CARTA Y LAS FOTOS ---
     const continuarBtn = document.getElementById('continuar');
     const overlay = document.getElementById('overlay');
     const cerrarBtn = document.getElementById('cerrar');
@@ -481,7 +525,7 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
     const photosContainer = document.getElementById('photos-container');
 
     continuarBtn.addEventListener('click', () => {
-        continuarBtn.style.display = 'none'; // Oculta el botón
+        continuarBtn.style.display = 'none';
         envelopeWrapper.classList.add('show');
     });
 
@@ -489,8 +533,6 @@ canvas { display: block; position: fixed; inset: 0; z-index: 0; }
         envelopeWrapper.classList.add('opening');
         setTimeout(() => {
             overlay.classList.add('open');
-            card.style.transform = 'translateY(0) scale(1)';
-            card.style.opacity = '1';
         }, 400);
 
         setTimeout(() => {
