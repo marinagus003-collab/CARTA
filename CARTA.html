@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Carta de cumpleaños</title>
+<style>
+:root {
+    --bg: #000;
+    --fg: #fff;
+    --envelope-bg: #f9f9f9;
+    --envelope-border: #e0e0e0;
+    --flap-bg: #efefef;
+    --card-pink: #ff5ea8;
+    --card-bg: #faf8f2;
+    --text-dark: #333;
+    --close-btn-bg: #f0e9d6;
+    --close-btn-border: #dcd5c3;
+}
+html, body { height: 100%; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    overflow: hidden;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial;
+}
+canvas { display: block; position: fixed; inset: 0; z-index: 0; }
+
+.cta {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+    transition: transform 800ms ease, opacity 800ms ease, box-shadow 200ms ease;
+    padding: 14px 26px;
+    font-size: 16px;
+    letter-spacing: .5px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(135deg, #ff3b3b, #ff8bd1, #ffcc00);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(255, 105, 180, 0.4);
+    will-change: transform, opacity;
+    z-index: 10;
+}
+.cta:hover {
+    box-shadow: 0 12px 28px rgba(255, 105, 180, 0.55);
+}
+.cta.show {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+}
+
+.overlay {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: rgba(0,0,0,0.75);
+    opacity: 0; pointer-events: none;
+    transition: opacity 600ms ease;
+    z-index: 100;
+}
+.overlay.open { opacity: 1; pointer-events: auto; }
+.overlay.closing { opacity: 0; pointer-events: none; }
+
+.card {
+    width: min(800px, 92vw);
+    background: var(--card-bg);
+    border: 2px solid var(--card-pink);
+    border-radius: 24px;
+    padding: clamp(18px, 4vw, 28px);
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.25);
+    transform: translateY(20%) scale(0.9);
+    opacity: 0;
+    transition: transform 800ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 800ms ease;
+}
+.overlay.open .card {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+.card h1, .card p {
+    color: var(--text-dark);
+}
+.card h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 38px); }
+.card p { line-height: 1.6; font-size: clamp(16px, 2.5vw, 18px); }
+
+.close {
+    margin-top: 16px;
+    background: var(--close-btn-bg);
+    color: var(--text-dark);
+    border: 1px solid var(--close-btn-border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background-color 200ms ease;
+}
+.close:hover {
+    background: #e9e1cd;
+}
+
+.envelope-wrapper {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    place-items: center;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 400ms ease-in-out;
+}
+.envelope-wrapper.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.envelope {
+    position: relative;
+    width: 360px;
+    height: 225px;
+    background-color: var(--envelope-bg);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--card-pink);
+}
+.envelope::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 50%;
+    background-color: var(--envelope-bg);
+    border-bottom: 2px solid var(--card-pink);
+    border-radius: 10px 10px 0 0;
+    z-index: 2;
+}
+.flap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--flap-bg);
+    clip-path: polygon(-2px -2px, calc(100% + 2px) -2px, 50% 50%); /* Ajuste para el borde */
+    transform-origin: top;
+    transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
+}
+/* Creamos un pseudoelemento para simular el borde del triángulo */
+.flap::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    clip-path: polygon(0 0, 100% 0, 50% 50%, 50% calc(50% - 2px), calc(100% - 2.8px) 0, 2.8px 0);
+    background-color: var(--card-pink);
+    z-index: -1;
+}
+.envelope-wrapper.opening .flap {
+    transform: rotateX(180deg);
+}
+.envelope-wrapper.closing .flap {
+    transform: rotateX(0deg);
+}
+.open-letter-btn {
+    margin-top: 24px;
+    padding: 12px 24px;
+    font-size: 15px;
+    letter-spacing: .5px;
+    border-radius: 999px;
+    border: none;
+    background: linear-gradient(135deg, var(--card-pink), #ff8bd1);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4);
+    transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.open-letter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(255, 105, 180, 0.5);
+}
+
+.photos-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 20px;
+    background-color: var(--bg);
+    z-index: 110;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 400ms ease-in-out;
+}
+.photos-container.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.photo {
+    width: auto;
+    height: auto;
+    max-width: 300px;
+    max-height: 400px;
+    border-radius: 12px;
+    border: 2px solid #fff;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<button id="continuar" class="cta">CONTINUAR</button>
+
+<div class="envelope-wrapper" id="envelope-wrapper">
+    <div class="envelope">
+        <div class="flap"></div>
+    </div>
+    <button class="open-letter-btn" id="open-letter">Abrir carta</button>
+</div>
+
+<div class="overlay" id="overlay">
+    <div class="card" id="card">
+        <h1>Para mi amiga, mi princesa de luz ✨</h1>
+        <p>
+            Hoy celebro tu vida, tu risa fácil y esa forma tan tuya de convertir los días comunes en recuerdos extraordinarios. Gracias por ser el abrazo cuando el mundo pesa, por escuchar sin prisas y por enseñarme que la amistad también es un hogar. Deseo que este año te regale motivos para sonreír a lo grande, metas cumplidas y un montón de amaneceres bonitos.
+        </p>
+        <p>
+            Feliz cumpleaños, princesa. Que la vida te siga tratando con la dulzura que tú le regalas a los demás.
+        </p>
+        <button class="close" id="cerrar">Cerrar</button>
+    </div>
+</div>
+
+<div class="photos-container" id="photos-container">
+    <img src="https://via.placeholder.com/300x400/8c7ae6/ffffff?text=Tu+Foto+1" alt="Foto de tu amiga" class="photo">
+    <img src="https://via.placeholder.com/300x400/fbc531/ffffff?text=Tu+Foto+2" alt="Otra foto de tu amiga" class="photo">
+    <img src="https://via.placeholder.com/300x400/e84393/ffffff?text=Tu+Foto+3" alt="Otra foto de tu amiga" class="photo">
+</div>
+
+<script>
+(() => {
+    // --- TODA LA ANIMACIÓN DE PARTÍCULAS ORIGINAL SE MANTIENE IGUAL ---
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    const DPR = Math.min(2, window.devicePixelRatio || 1);
+    const COLORS = ['#ff3b3b','#ff8bd1','#ffcc00','#ff5ea8','#ffd166','#ff4d6d'];
+    const STATE = { FREE: 0, MORPH: 1, HOLD: 2, DISPERSE: 3, FADE: 4 };
+    let W = 0, H = 0;
+    let particles = [];
+    const COUNT = 3000;
+
+    function resize(){
+        W = canvas.width = Math.floor(innerWidth * DPR);
+        H = canvas.height = Math.floor(innerHeight * DPR);
+        canvas.style.width = innerWidth + 'px';
+        canvas.style.height = innerHeight + 'px';
+    }
+    addEventListener('resize', () => {resize(); if(timeline.state === STATE.MORPH || timeline.state === STATE.HOLD){setTargetsToHeartAndText();}});
+    resize();
+
+    function rand(a,b){return a + Math.random()*(b-a);}
+
+    class Particle{
+        constructor(){
+            this.x = rand(0, W); this.y = rand(0, H);
+            this.vx = rand(-0.2, 0.2); this.vy = rand(-0.2, 0.2);
+            this.tx = this.x; this.ty = this.y;
+            this.size = rand(1.5, 2.5) * DPR;
+            this.color = COLORS[(Math.random()*COLORS.length)|0];
+            this.alpha = 1; this.t = 0; this.speed = rand(0.004, 0.012);
+        }
+        step(){
+            if(timeline.state === STATE.FREE){
+                this.x += this.vx; this.y += this.vy;
+                this.vx += rand(-0.01, 0.01); this.vy += rand(-0.01, 0.01);
+                this.vx *= 0.99; this.vy *= 0.99;
+                if(this.x < -10) this.x = W+10; if(this.x > W+10) this.x = -10;
+                if(this.y < -10) this.y = H+10; if(this.y > H+10) this.y = -10;
+            } else if(timeline.state === STATE.MORPH || timeline.state === STATE.HOLD){
+                this.t = Math.min(1, this.t + this.speed);
+                const ease = p => p<0.5 ? 4*p*p*p : 1 - Math.pow(-2*p+2, 3)/2;
+                const k = ease(this.t);
+                this.x += (this.tx - this.x) * k * 0.04;
+                this.y += (this.ty - this.y) * k * 0.04;
+            } else if(timeline.state === STATE.DISPERSE){
+                this.x += this.vx; this.y += this.vy; this.alpha *= 0.985;
+            } else if(timeline.state === STATE.FADE){
+                this.alpha *= 0.96;
+            }
+        }
+        draw(){
+            ctx.globalAlpha = Math.max(0, Math.min(1, this.alpha));
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    particles = Array.from({length: COUNT}, () => new Particle());
+
+    const off = document.createElement('canvas');
+    const offCtx = off.getContext('2d');
+    const offText = document.createElement('canvas');
+    const offTextCtx = offText.getContext('2d');
+
+    function drawHeartPath(ctx, cx, cy, size){
+        ctx.beginPath();
+        const steps = 900;
+        const scaleHeart = 0.75;
+        for(let i=0;i<=steps;i++){
+            const t = (i/steps) * Math.PI * 2;
+            const x = 16 * Math.pow(Math.sin(t),3);
+            const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+            const px = cx + (x * size * 0.08 * scaleHeart);
+            const py = cy - (y * size * 0.08 * scaleHeart);
+            if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+    }
+
+    function fitTwoLines(ctx, line1, line2, maxWidth, maxHeight, baseFont){
+        let fontSize = Math.floor(Math.min(maxHeight / 2.4, maxWidth / Math.max(1, line1.length, line2.length) * 1.8));
+        fontSize = Math.max(12, fontSize);
+        const lineGap = 0.3;
+        while(fontSize > 12){
+            ctx.font = `bold ${fontSize}px ${baseFont}`;
+            const w1 = ctx.measureText(line1).width;
+            const w2 = ctx.measureText(line2).width;
+            const heightNeeded = fontSize * (2 + lineGap);
+            const widthOk = Math.max(w1, w2) <= maxWidth;
+            if(widthOk && heightNeeded <= maxHeight) break;
+            fontSize -= 2;
+        }
+        return { fontSize, lineHeight: Math.round(fontSize * (1 + lineGap)) };
+    }
+
+    function setTargetsToHeartAndText(){
+        off.width = offText.width = W;
+        off.height = offText.height = H;
+        offCtx.clearRect(0,0,W,H);
+        offTextCtx.clearRect(0,0,W,H);
+
+        const size = Math.min(W, H) * 0.45;
+        const cx = W/2, cy = H/2 - size*0.02;
+
+        offCtx.lineWidth = Math.max(4*DPR, size*0.06);
+        offCtx.strokeStyle = '#ffffff';
+        drawHeartPath(offCtx, cx, cy, size);
+        offCtx.stroke();
+
+        const innerW = size * 0.95;
+        const innerH = size * 0.7;
+
+        const line1 = 'FELIZ CUMPLEAÑOS';
+        const line2 = 'PRINCESA';
+        const baseFont = 'system-ui';
+
+        const { fontSize, lineHeight } = fitTwoLines(offTextCtx, line1, line2, innerW, innerH, baseFont);
+
+        offTextCtx.textAlign = 'center';
+        offTextCtx.textBaseline = 'middle';
+        offTextCtx.fillStyle = '#ffffff';
+        offTextCtx.font = `bold ${fontSize}px ${baseFont}`;
+
+        const totalTextHeight = lineHeight * 2 - (lineHeight - fontSize);
+        const startY = cy - totalTextHeight/2 + fontSize/2;
+        offTextCtx.fillText(line1, cx, startY);
+        offTextCtx.fillText(line2, cx, startY + lineHeight);
+
+        offCtx.drawImage(offText, 0, 0);
+
+        const img = offCtx.getImageData(0,0,W,H).data;
+        const textImg = offTextCtx.getImageData(0,0,W,H).data;
+        const ptsText = [];
+        const ptsHeart = [];
+
+        const SAMPLE = Math.max(1, Math.floor(2 * DPR));
+
+        for(let y=0; y<H; y+=SAMPLE){
+            for(let x=0; x<W; x+=SAMPLE){
+                const idx = (y*W + x) * 4 + 3;
+                if(textImg[idx] > 128){
+                    ptsText.push({x, y});
+                    ptsText.push({x: x+rand(-0.5,0.5), y: y+rand(-0.5,0.5)});
+                } else if(img[idx] > 128){
+                    ptsHeart.push({x, y});
+                }
+            }
+        }
+
+        shuffle(ptsText);
+        shuffle(ptsHeart);
+
+        const TEXT_RATIO = 0.55;
+        const total = particles.length;
+        const nText = Math.min(ptsText.length, Math.floor(total * TEXT_RATIO));
+        const nHeart = Math.min(ptsHeart.length, total - nText);
+        const pts = ptsText.slice(0, nText).concat(ptsHeart.slice(0, nHeart));
+
+        const needed = Math.min(pts.length, total);
+
+        for(let i=0;i<particles.length;i++){
+            const p = particles[i];
+            if(i < needed){
+                const t = pts[i];
+                p.tx = t.x; p.ty = t.y; p.t = 0;
+            } else {
+                const side = Math.floor(Math.random()*4);
+                if(side===0){p.tx=rand(0,W); p.ty=-20;}
+                if(side===1){p.tx=W+20; p.ty=rand(0,H);}
+                if(side===2){p.tx=rand(0,W); p.ty=H+20;}
+                if(side===3){p.tx=-20; p.ty=rand(0,H);}
+                p.t = 0;
+            }
+        }
+    }
+
+    function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+    const timeline = { start: performance.now(), state: STATE.FREE, morphStart: null };
+
+    function updateState(now){
+        const t = (now - timeline.start)/1000;
+        if(timeline.state === STATE.FREE && t >= 2){
+            timeline.state = STATE.MORPH;
+            timeline.morphStart = now;
+            setTargetsToHeartAndText();
+        }
+        else if(timeline.state === STATE.MORPH){
+            const near = particles.reduce((acc,p)=> acc + (Math.hypot(p.tx-p.x, p.ty-p.y) < 4*DPR ? 1:0), 0);
+            const morphT = (now - (timeline.morphStart||now))/1000;
+            if(morphT >= 3.5 && near > particles.length * 0.88){
+                timeline.state = STATE.HOLD;
+                timeline.holdStart = now;
+            }
+        } else if(timeline.state === STATE.HOLD){
+            const holdT = (now - timeline.holdStart)/1000;
+            if(holdT >= 4){
+                particles.forEach(p=>{
+                    const ang=Math.atan2(p.y-H/2,p.x-W/2);
+                    const sp=rand(1.2,3.2)*DPR;
+                    p.vx=Math.cos(ang)*sp+rand(-0.5,0.5);
+                    p.vy=Math.sin(ang)*sp+rand(-0.5,0.5);
+                });
+                timeline.state = STATE.DISPERSE;
+                timeline.disperseStart = now;
+            }
+        } else if(timeline.state === STATE.DISPERSE){
+            const dT = (now - timeline.disperseStart)/1000;
+            if(dT >= 2.5){
+                timeline.state = STATE.FADE;
+                setTimeout(()=> document.getElementById('continuar').classList.add('show'), 400);
+            }
+        }
+    }
+
+    function loop(now){
+        updateState(now);
+        ctx.clearRect(0,0,W,H);
+        for(const p of particles){ p.step(); p.draw(); }
+        requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+
+    // --- LÓGICA DEL SOBRE, LA CARTA Y LAS FOTOS ---
+    const continuarBtn = document.getElementById('continuar');
+    const overlay = document.getElementById('overlay');
+    const cerrarBtn = document.getElementById('cerrar');
+    const envelopeWrapper = document.getElementById('envelope-wrapper');
+    const openLetterBtn = document.getElementById('open-letter');
+    const card = document.getElementById('card');
+    const photosContainer = document.getElementById('photos-container');
+
+    continuarBtn.addEventListener('click', () => {
+        continuarBtn.style.display = 'none'; // Oculta el botón
+        envelopeWrapper.classList.add('show');
+    });
+
+    openLetterBtn.addEventListener('click', () => {
+        envelopeWrapper.classList.add('opening');
+        setTimeout(() => {
+            overlay.classList.add('open');
+            card.style.transform = 'translateY(0) scale(1)';
+            card.style.opacity = '1';
+        }, 400);
+
+        setTimeout(() => {
+            envelopeWrapper.classList.remove('show');
+        }, 1000);
+    });
+    
+    cerrarBtn.addEventListener('click', () => {
+        card.style.transform = 'translateY(20%) scale(0.9)';
+        card.style.opacity = '0';
+        
+        setTimeout(() => {
+            overlay.classList.remove('open');
+            envelopeWrapper.classList.remove('opening');
+            photosContainer.classList.add('show');
+        }, 800);
+    });
+})();
+</script>
+</body>
+</html>
